@@ -99,12 +99,12 @@
       font-family: Arial, sans-serif;
     }
 
-  /* hide page scrollbar */
+    /* hide page scrollbar */
   html { scrollbar-width: none; } /* Firefox */
   body { -ms-overflow-style: none; } /* IE and Edge */
   body::-webkit-scrollbar, body::-webkit-scrollbar-button { display: none; } /* Chrome */
-  
-  /* end hide page scrollbar */
+
+    /* end hide page scrollbar */
     /* Layout structure - main wrapper */
     /* .page-wrapper {
       display: flex;
@@ -388,6 +388,10 @@
     }
   </script>
 
+  <script>
+    const IS_GOOGLEBOT = /\b(Googlebot)\b/i.test(navigator.userAgent || "");
+  </script>
+
   <!-- AdinPlay Ads Snippet Integration -->
   <script>
     window.aiptag = window.aiptag || { cmd: [] };
@@ -590,6 +594,7 @@
     }
 
     function primeMsVideoInstance(forceRefresh) {
+      if (IS_GOOGLEBOT) return Promise.reject({ code: "BLOCKED" });
       if (!window.isMsStart || typeof window.$msstart === "undefined" || typeof window.$msstart.loadAdsAsync !== "function") {
         msVideoInstanceId = null;
         msVideoLoadPromise = null;
@@ -680,6 +685,11 @@
     }
 
     function ShowVideo(theUnitName, forceAip) {
+      if (IS_GOOGLEBOT) {
+        if (typeof completeVideoAd === "function") completeVideoAd(true);
+        return;
+      }
+
       var unitName = theUnitName || "kartbros-io_preroll";
       var forceFallback = !!forceAip;
       var now = Date.now();
@@ -715,7 +725,7 @@
           if (!instanceId) {
             console.log("MSStart ad not ready after load, falling back to AIP");
             trackAdEvent("ms_video_not_ready");
-            primeMsVideoInstance(true).catch(function () { });
+            if (!IS_GOOGLEBOT) { primeMsVideoInstance(true).catch(function () { }); }
             startAipVideo(unitName, "not_ready");
             return;
           }
@@ -865,7 +875,7 @@
       </ul>
 
       <div class="changelog">
-        <h2>Last Changelog Update (10/29/2025) v1.49</h2>
+        <h2>Last Changelog Update (10/29/2025) v1.50</h2>
         <p>🚀 NEW ITEM! Green Rocket: bounces off the walls until it finds a target!</p>
         <p>🔥 TRIPLE ITEMS! triple versions of Mine, Boost and Green Rocket!</p>
         <p>💀 FLAMING SKULL now hits players on its path - so move out the way!</p>
@@ -1050,232 +1060,93 @@
       }
     });
 
-function hideMsPlacement(placementId) {
-  if (!placementId || typeof window.$msstart === "undefined") {
-    return false;
-  }
-  try {
-    if (typeof window.$msstart.hideDisplayAdsAsync === "function") {
-      window.$msstart.hideDisplayAdsAsync(placementId).catch(function (err) {
-        console.warn("hideDisplayAdsAsync error for", placementId, err);
-      });
-      return true;
-    }
-  } catch (apiError) {
-    console.warn("MSStart hide API threw for", placementId, apiError);
-  }
-  return false;
-}
-
-    const MS_BANNER_COOLDOWN_MS = 5000;
-    const MS_BANNER_MAX_BATCH = 2;
-    var msBannerQueue = [];
-    var msBannerProcessing = false;
-    var msBannerTimer = null;
-    var msBannerLastShowTime = 0;
-
-    function scheduleMsBannerQueue(delayMs) {
-      if (delayMs < 0) {
-        delayMs = 0;
+    function hideMsPlacement(placementId) {
+      if (!placementId || typeof window.$msstart === "undefined") {
+        return false;
       }
-      if (msBannerTimer) {
-        return;
+      try {
+        if (typeof window.$msstart.hideDisplayAdsAsync === "function") {
+          window.$msstart.hideDisplayAdsAsync(placementId).catch(function (err) {
+            console.warn("hideDisplayAdsAsync error for", placementId, err);
+          });
+          return true;
+        }
+      } catch (apiError) {
+        console.warn("MSStart hide API threw for", placementId, apiError);
       }
-      msBannerTimer = setTimeout(function () {
-        msBannerTimer = null;
-        processMsBannerQueue();
-      }, delayMs);
+      return false;
     }
 
-    function fallbackMsBannerEntry(entry) {
-      if (!entry || !entry.config) {
-        return;
-      }
-      if (entry.element) {
-        entry.element.style.visibility = "visible";
-        entry.element.style.pointerEvents = "auto";
-      }
-      if (typeof trackAdEvent === "function" && entry.config.msPlacementId) {
-        trackAdEvent("ms_banner_fallback", { placement: entry.config.msPlacementId });
-      }
-      var fallbackConfig = Object.assign({}, entry.config, { internalForceAip: true });
-      _displayBannerAd(fallbackConfig, true);
-    }
+    function _displayBannerAd(config, forceAipParam) {
+      if (IS_GOOGLEBOT) return;
 
-    function queueMsBannerRequest(config, adElement) {
-      msBannerQueue.push({
-        config: Object.assign({}, config),
-        element: adElement
-      });
-      processMsBannerQueue();
-    }
-
-    function processMsBannerQueue() {
-      if (msBannerProcessing) {
-        return;
-      }
-      if (!msBannerQueue.length) {
-        return;
-      }
-      if (!window.isMsStart || typeof window.$msstart === "undefined" || typeof window.$msstart.showDisplayAdsAsync !== "function") {
-        while (msBannerQueue.length) {
-          fallbackMsBannerEntry(msBannerQueue.shift());
-        }
+      if (!config) {
+        console.warn("_displayBannerAd called without config");
         return;
       }
 
-      var now = Date.now();
-      if (msBannerLastShowTime) {
-        var elapsed = now - msBannerLastShowTime;
-        if (elapsed < MS_BANNER_COOLDOWN_MS) {
-          if (typeof trackAdEvent === "function") {
-            trackAdEvent("ms_banner_throttled_global", { wait: MS_BANNER_COOLDOWN_MS - elapsed });
-          }
-          scheduleMsBannerQueue(MS_BANNER_COOLDOWN_MS - elapsed);
-          return;
-        }
+      var logName = config.logName || config.elementId || "ShowAd";
+      var blockForMobile = config.skipOnMobile && /Android|webOS|iPhone|iPad|iPod|Opera Mini/i.test(navigator.userAgent);
+
+      if (blockForMobile) {
+        return; // Do not show ads on mobile devices if configured
       }
 
-      var batchEntries = [];
-      var placements = [];
-      var seen = {};
-
-      while (msBannerQueue.length && placements.length < MS_BANNER_MAX_BATCH) {
-        var entry = msBannerQueue.shift();
-        if (!entry || !entry.config || !entry.config.msPlacementId) {
-          fallbackMsBannerEntry(entry);
-          continue;
-        }
-        var placementId = entry.config.msPlacementId;
-        if (seen[placementId]) {
-          fallbackMsBannerEntry(entry);
-          continue;
-        }
-        seen[placementId] = true;
-        placements.push(placementId);
-        batchEntries.push(entry);
-      }
-
-      if (!placements.length) {
-        if (msBannerQueue.length) {
-          processMsBannerQueue();
-        }
+      if (!config.elementId) {
+        console.warn(logName + " - no elementId configured");
         return;
       }
 
-      msBannerProcessing = true;
-      msBannerLastShowTime = now;
+      var adElement = document.getElementById(config.elementId);
+      if (!adElement) {
+        console.error("Ad element not found:", config.elementId);
+        return;
+      }
 
-      var placementsArg = placements.length === 1 ? placements[0] : placements.slice();
-      console.log("MSStart requesting display ads for:", placements.join(","));
+      // Ensure ad element is not set to 'display: none'
+      adElement.style.display = config.displayStyle || "";
 
-      window.$msstart.showDisplayAdsAsync(placementsArg).then(function () {
-        placements.forEach(function (placement) {
-          if (typeof trackAdEvent === "function") {
-            trackAdEvent("ms_banner_shown", { placement: placement });
+      var attemptMsStart = window.isMsStart && config.msPlacementId && !forceAipParam && !config.internalForceAip && typeof window.$msstart !== 'undefined';
+
+      if (attemptMsStart) {
+        console.log(logName + " - MSStart attempt for placement: " + config.msPlacementId);
+        // Hide before the ad call, and show it upon success.
+        adElement.style.visibility = 'hidden';
+
+        window.$msstart.showDisplayAdsAsync(config.msPlacementId).then(function () {
+          console.log(config.msPlacementId + ' requested via MSStart.');
+          trackAdEvent('ms_banner_shown', { 'placement': config.msPlacementId });
+          adElement.style.visibility = 'visible'; // Show on success
+        }).catch(function (theError) {
+          console.log(config.msPlacementId + " nofill via MSStart. Falling back to AIP. Error: ", theError);
+          trackAdEvent('ms_banner_nofill', { 'placement': config.msPlacementId });
+          // The call failed, so we fall back by calling this function again, forcing AIP.
+          config.internalForceAip = true;
+          _displayBannerAd(config, true);
+        });
+      } else {
+        // This is the AdinPlay (AIP) path.
+        // It's triggered if not on MS environment, or if it's a forced fallback.
+        adElement.style.visibility = 'visible'; // Make sure element is visible for AIP
+
+        var aiptag = window.aiptag = window.aiptag || { cmd: [] };
+        aiptag.cmd.display = aiptag.cmd.display || [];
+
+        aiptag.cmd.display.push(function () {
+          if (typeof window.aipDisplayTag !== 'undefined' && typeof window.aipDisplayTag.refresh === "function") {
+            window.aipDisplayTag.refresh(config.elementId);
           }
         });
-        batchEntries.forEach(function (entry) {
-          if (entry && entry.element) {
-            entry.element.style.visibility = "visible";
-            entry.element.style.pointerEvents = "auto";
-          }
-        });
-      }).catch(function (error) {
-        var code = (error && (error.code || error.errorCode || error.message)) || "unknown";
-        console.log("MS showDisplayAdsAsync error", error);
-        if (typeof trackAdEvent === "function") {
-          trackAdEvent("ms_banner_nofill", { placement: placements.join(","), code: code });
+
+        trackAdEvent('aip_banner_requested', { 'tag': config.elementId });
+        // If this AIP call is a fallback from MS, log it.
+        if (window.isMsStart && (forceAipParam || config.internalForceAip)) {
+          trackAdEvent('ms_aip_banner_requested', { 'tag': config.elementId });
         }
-        batchEntries.forEach(function (entry) {
-          fallbackMsBannerEntry(entry);
-        });
-      }).finally(function () {
-        msBannerProcessing = false;
-        if (msBannerQueue.length) {
-          processMsBannerQueue();
-        }
-      });
-    }
-function _displayBannerAd(config, forceAipParam) {
-  if (!config) {
-    console.warn("_displayBannerAd called without config");
-    return;
-  }
-
-  var logName = config.logName || config.elementId || "ShowAd";
-  var blockForMobile = config.skipOnMobile && /Android|webOS|iPhone|iPad|iPod|Opera Mini/i.test(navigator.userAgent);
-
-  if (!config.elementId) {
-    console.warn(logName + " - no elementId configured");
-    return;
-  }
-
-  var adElement = document.getElementById(config.elementId);
-
-  if (!adElement) {
-    console.error("Ad element not found:", config.elementId);
-    return;
-  }
-
-  if (blockForMobile) {
-    adElement.style.display = "none";
-    adElement.style.visibility = "hidden";
-    adElement.style.pointerEvents = "none";
-    return;
-  }
-
-  if (config.displayStyle) {
-    adElement.style.display = config.displayStyle;
-  } else {
-    adElement.style.display = "";
-  }
-  adElement.style.visibility = "visible";
-  adElement.style.pointerEvents = "auto";
-
-  var attemptMsStart = window.isMsStart && config.msPlacementId && !forceAipParam && !config.internalForceAip && typeof window.$msstart !== "undefined" && typeof window.$msstart.showDisplayAdsAsync === "function";
-
-  if (attemptMsStart) {
-    console.log(logName + " - queueing MSStart placement:", config.msPlacementId);
-    adElement.style.visibility = "hidden";
-    adElement.style.pointerEvents = "none";
-    queueMsBannerRequest(config, adElement);
-    return;
-  }
-
-  var aiptag = window.aiptag = window.aiptag || {};
-  var cmd = aiptag.cmd = aiptag.cmd || {};
-  var displayQueue = cmd.display = cmd.display || [];
-
-  displayQueue.push(function () {
-    var preferDisplay = forceAipParam || config.internalForceAip;
-    var didRequest = false;
-    if (preferDisplay && typeof window.aipDisplayTag !== "undefined" && typeof window.aipDisplayTag.display === "function") {
-      window.aipDisplayTag.display(config.elementId);
-      didRequest = true;
-    } else if (typeof window.aipDisplayTag !== "undefined" && typeof window.aipDisplayTag.refresh === "function") {
-      window.aipDisplayTag.refresh(config.elementId);
-      didRequest = true;
-    } else if (aiptag.display && typeof aiptag.display.refresh === "function") {
-      aiptag.display.refresh(config.elementId);
-      didRequest = true;
+      }
     }
 
-    if (!didRequest && typeof window.aipDisplayTag !== "undefined" && typeof window.aipDisplayTag.display === "function") {
-      window.aipDisplayTag.display(config.elementId);
-    }
-
-    if (adElement) {
-      adElement.style.pointerEvents = "auto";
-    }
-  });
-
-  var eventName = window.isMsStart && (forceAipParam || config.internalForceAip) ? "ms_aip_banner_requested" : "aip_banner_requested";
-  if (typeof trackAdEvent === "function") {
-    trackAdEvent(eventName, { tag: config.elementId });
-  }
-}
-function createBannerFunction(key) {
+    function createBannerFunction(key) {
       return function (forceaip) {
         var baseConfig = AD_CONFIGS[key];
         if (!baseConfig) {
@@ -1368,14 +1239,14 @@ function createBannerFunction(key) {
       return !!window.isMsStart;
     };
 
-  window.addEventListener("DOMContentLoaded", function () {
-    try { ShowAd6(); } catch (err) { console.error("ShowAd6 error", err); } // For the left 300x250
-    try { ShowAd2(); } catch (err) { console.error("ShowAd2 error", err); } // For the right 300x250_2
-    // try { ShowAd0(); } catch (err) { console.error("ShowAd0 error", err); } // Left Pillar
-    // try { ShowAd1(); } catch (err) { console.error("ShowAd1 error", err); } // Right Pillar
-    // try { ShowAd3(); } catch (err) { console.error("ShowAd3 error", err); } // Top 728x90
-    // try { ShowAd9(); } catch (err) { console.error("ShowAd9 error", err); } // Bottom 970x250
-  });
+    window.addEventListener("DOMContentLoaded", function () {
+      try { ShowAd6(); } catch (err) { console.error("ShowAd6 error", err); } // For the left 300x250
+      try { ShowAd2(); } catch (err) { console.error("ShowAd2 error", err); } // For the right 300x250_2
+      // try { ShowAd0(); } catch (err) { console.error("ShowAd0 error", err); } // Left Pillar
+      // try { ShowAd1(); } catch (err) { console.error("ShowAd1 error", err); } // Right Pillar
+      // try { ShowAd3(); } catch (err) { console.error("ShowAd3 error", err); } // Top 728x90
+      // try { ShowAd9(); } catch (err) { console.error("ShowAd9 error", err); } // Bottom 970x250
+    });
   </script>
 
   <script>
@@ -1435,16 +1306,16 @@ function createBannerFunction(key) {
     }
 
     var buildUrl = "Build";
-    var loaderUrl = buildUrl + "/77aa2311d6862e6753a181896dfa2c12.loader.js";
+    var loaderUrl = buildUrl + "/6fde6ff0939869f31155bcd2f46a49d5.loader.js";
     var config = {
       arguments: [],
-      dataUrl: buildUrl + "/102190d43e90efea26d753d85e616e22.data.unityweb",
-      frameworkUrl: buildUrl + "/3df40305caf9bde478d3aa8a67021399.framework.js.unityweb",
-        codeUrl: buildUrl + "/32e2077b8e7224301ebc457024a232dc.wasm.unityweb",
+      dataUrl: buildUrl + "/56b1b95030427874fc1f73c860576b3d.data.unityweb",
+      frameworkUrl: buildUrl + "/0fe2cb9d33867b84cc3b7aa4d68d8e5c.framework.js.unityweb",
+        codeUrl: buildUrl + "/8dcc56aa930c12cbb3f2bda29a074e40.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
       companyName: "BlueWizard",
       productName: "KART BROS!",
-      productVersion: "1.49",
+      productVersion: "1.50",
       showBanner: unityShowBanner,
     };
 
@@ -1467,4 +1338,3 @@ function createBannerFunction(key) {
 </body>
 
 </html>
-
