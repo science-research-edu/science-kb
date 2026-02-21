@@ -22,7 +22,6 @@
   </script>
 
   <style>
-    /* ALL ORIGINAL STYLES KEPT */
     html, body { margin: 0; padding: 0; background: #000000; color: #000; font-family: Arial, sans-serif; }
     html { scrollbar-width: none; } 
     body { -ms-overflow-style: none; } 
@@ -35,7 +34,6 @@
     .spinning-wheel { display: inline-block; transform-origin: center; animation: spin 1s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* FORCE HIDE ALL AD BOXES */
     #adContainerMainMenu, #adContainerTop, #adContainerBottom, #adContainerPillars, #videoAdOverlay { 
         display: none !important; 
         visibility: hidden !important; 
@@ -44,11 +42,9 @@
   </style>
 
   <script>
-    // --- AD BLOCKING REPLACEMENT ---
     window.aiptag = { cmd: { display: [], player: [] } };
     window.isMsStart = false;
 
-    // This is the main "Cheat" - it tells the game the ad is finished the millisecond it's requested
     function completeVideoAd(isBlocked) {
       if (typeof window.Main !== "undefined" && typeof window.Main.DoneVideoAd === "function") {
         window.Main.DoneVideoAd(false);
@@ -61,12 +57,9 @@
     }
 
     function LoadVideo() { return; }
-    
-    // Stub out tracking so it doesn't break things
     function SendEvent() { return; }
     function gtag() { return; }
     function GA4_SendEvent() { return; }
-    // --- END AD BLOCKING ---
   </script>
 </head>
 
@@ -96,10 +89,19 @@
     <div id="adContainerPillars"></div>
   </div>
 
-  <script src="Build/UnityLoader.js"></script>
+  <script src="Build/1c5c2b799f24adb3aee763b89a42a07b.loader.js"></script>
   <script>
-    // This looks for the local JSON file in your /Build folder
-    var unityInstance = UnityLoader.instantiate("unity-canvas", "Build/kartbros.json");
+    createUnityInstance(document.querySelector("#unity-canvas"), {
+      dataUrl: "Build/e7e6a46b3086885e8d87f10a010ccb74.data.unityweb",
+      frameworkUrl: "Build/649344238019636530d089f7c59360f7.framework.js.unityweb",
+      codeUrl: "Build/fbaee9566eaf23158954926b50c27e61.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "Blue Wizard Digital",
+      productName: "Kart Bros",
+      productVersion: "1.62",
+    }).then((unityInstance) => {
+      document.querySelector("#unity-loading-bar").style.display = "none";
+    });
   </script>
 
   <div class="info-section">
