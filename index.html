@@ -9,7 +9,6 @@
   <link rel="canonical" href="https://kartbros.io/">
   <link rel="manifest" href="manifest.json" />
   <meta name="description" content="Kart Bros Ad-Free">
-
   <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 
   <script>
@@ -22,76 +21,70 @@
   </script>
 
   <style>
-    html, body { margin: 0; padding: 0; background: #000000; color: #000; font-family: Arial, sans-serif; }
-    html { scrollbar-width: none; } 
-    body { -ms-overflow-style: none; } 
-    body::-webkit-scrollbar, body::-webkit-scrollbar-button { display: none; } 
-    .game-section { width: 100%; height: 100%; background: #000; position: relative; align-items: center; justify-content: center; }
-    #unity-loading-bar { background: #000; position: absolute; top: 60%; align-items: center; justify-content: center; z-index: 15; width: 100%; text-align: center; }
-    .info-section { width: 100%; height: 100%; background: #000; position: relative; padding: 20px 0; color: white; }
-    #unity-canvas { background: #000; width: 100%; float: left; height: calc(var(--vh, 1vh)*100); overscroll-behavior: none; }
-    .container { width: calc(100% - 420px); margin: 20px auto; padding: 20px; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 10px; color: black; }
-    .spinning-wheel { display: inline-block; transform-origin: center; animation: spin 1s linear infinite; }
+    /* Fixed Layout to prevent 0-pixel height screens */
+    html, body { 
+      margin: 0; padding: 0; width: 100%; height: 100%; 
+      background: #000; overflow: hidden; color: white; 
+    }
+    
+    .game-section { 
+      width: 100vw; height: 100vh; 
+      display: flex; align-items: center; justify-content: center;
+      position: relative; 
+    }
+
+    #unity-canvas { 
+      width: 100% !important; height: 100% !important; 
+      background: #000; display: block;
+      z-index: 1;
+    }
+
+    #unity-loading-bar { 
+      position: absolute; z-index: 10; width: 100%; text-align: center; 
+    }
+
+    .spinning-wheel { 
+      display: inline-block; animation: spin 1s linear infinite; 
+    }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+    /* Hide Ad containers */
     #adContainerMainMenu, #adContainerTop, #adContainerBottom, #adContainerPillars, #videoAdOverlay { 
-        display: none !important; 
-        visibility: hidden !important; 
-        pointer-events: none !important; 
+      display: none !important; visibility: hidden !important; 
     }
   </style>
 
   <script>
+    // AD-BLOCK BYPASS
     window.aiptag = { cmd: { display: [], player: [] } };
-    window.isMsStart = false;
-
-    function completeVideoAd(isBlocked) {
+    function completeVideoAd() {
       if (typeof window.Main !== "undefined" && typeof window.Main.DoneVideoAd === "function") {
         window.Main.DoneVideoAd(false);
       }
     }
-
-    function ShowVideo(theUnitName, forceAip) {
-      console.log("Ad Blocked: Skipping to game...");
-      completeVideoAd(false);
-    }
-
+    function ShowVideo() { completeVideoAd(); }
     function LoadVideo() { return; }
     function SendEvent() { return; }
     function gtag() { return; }
-    function GA4_SendEvent() { return; }
   </script>
 </head>
 
 <body>
-  <noscript>
-    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial;font-size:20px;z-index:9999;">
-      Enable JavaScript bro!
-    </div>
-  </noscript>
 
   <div class="game-section">
-    <canvas id="unity-canvas" tabindex="-1" onblur="window.focus(); window.scrollTo(0, 0);"></canvas>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
 
     <div id="unity-loading-bar">
-      <center>
-        <img src="TemplateData/kart_wheel.png" class="spinning-wheel">
-        <br>
-        <img src="TemplateData/loading4.png">
-        <br>
-        <p style="color:white">LOADING AD-FREE BROS...</p>
-      </center>
+      <img src="TemplateData/kart_wheel.png" class="spinning-wheel" width="50">
+      <p>LOADING KART BROS...</p>
     </div>
-
-    <div id="adContainerMainMenu"></div>
-    <div id="adContainerTop"></div>
-    <div id="adContainerBottom"></div>
-    <div id="adContainerPillars"></div>
   </div>
 
   <script src="Build/1c5c2b799f24adb3aee763b89a42a07b.loader.js"></script>
   <script>
-    createUnityInstance(document.querySelector("#unity-canvas"), {
+    const canvas = document.querySelector("#unity-canvas");
+    
+    createUnityInstance(canvas, {
       dataUrl: "Build/e7e6a46b3086885e8d87f10a010ccb74.data.unityweb",
       frameworkUrl: "Build/649344238019636530d089f7c59360f7.framework.js.unityweb",
       codeUrl: "Build/fbaee9566eaf23158954926b50c27e61.wasm.unityweb",
@@ -99,16 +92,28 @@
       companyName: "Blue Wizard Digital",
       productName: "Kart Bros",
       productVersion: "1.62",
+      // CRITICAL GRAPHICS FIXES
+      devicePixelRatio: 1, 
+      matchWebGLToCanvasSize: true,
+      autoSyncPersistentDataPath: true,
+      webglContextAttributes: { 
+        preserveDrawingBuffer: true,
+        alpha: false,
+        antialias: false,
+        premultipliedAlpha: false
+      },
     }).then((unityInstance) => {
+      // Success! Hide the loader.
       document.querySelector("#unity-loading-bar").style.display = "none";
+      
+      // Forces the browser to "paint" the game if it's stuck white
+      window.dispatchEvent(new Event('resize'));
+      
+      // Auto-focus the game
+      canvas.focus();
+    }).catch((message) => {
+      console.error(message);
     });
   </script>
-
-  <div class="info-section">
-    <div class="container">
-      <h1>Kart Bros: Ad-Free Edition</h1>
-      <p>Controls: WASD to Drive, Space for Items.</p>
-    </div>
-  </div>
 </body>
 </html>
