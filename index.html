@@ -1,62 +1,112 @@
 <!DOCTYPE html>
 <html lang="en-us">
+
 <head>
   <meta charset="utf-8">
-  <title>KART BROS! - Ad-Free Module</title>
+  <title>KART BROS! - Ad-Free</title>
   <link rel="shortcut icon" href="TemplateData/favicon.ico">
   <link rel="stylesheet" href="TemplateData/style.css">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <link rel="canonical" href="https://kartbros.io/">
+  <link rel="manifest" href="manifest.json" />
+  <meta name="description" content="Kart Bros Ad-Free">
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 
   <script>
-    // 1. KILLS AD NETWORKS IMMEDIATELY
-    window.aiptag = { cmd: { display: [], player: [] } };
-    window.isMsStart = false;
-    
-    // 2. FAKE AD FUNCTIONS (Tells the game the "ad" is over instantly)
-    window.ShowVideo = function(unit) {
-      console.log("Ad request intercepted and skipped.");
-      completeVideoAd(false);
-    };
-    
-    window.LoadVideo = function() { return; };
-
-    function completeVideoAd(isBlocked) {
-      if (typeof window.Main !== "undefined" && typeof window.Main.DoneVideoAd === "function") {
-        window.Main.DoneVideoAd();
-      }
-    }
-
-    // Layout Helper
     function fit() {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
     }
     fit();
     addEventListener('resize', fit, { passive: true });
+    addEventListener('orientationchange', () => { setTimeout(fit, 450); });
   </script>
 
   <style>
-    html, body { margin: 0; padding: 0; background: #000; overflow: hidden; height: 100%; }
-    .game-section { width: 100%; height: 100%; position: relative; }
-    #unity-canvas { width: 100%; height: 100%; background: #000; display: block; }
-    #unity-loading-bar { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; text-align: center; }
-    /* Hide all potential ad containers just in case */
-    #adContainerMainMenu, #adContainerTop, #adContainerBottom, #adContainerPillars, #videoAdOverlay { display: none !important; visibility: hidden !important; }
+    /* ALL ORIGINAL STYLES KEPT */
+    html, body { margin: 0; padding: 0; background: #000000; color: #000; font-family: Arial, sans-serif; }
+    html { scrollbar-width: none; } 
+    body { -ms-overflow-style: none; } 
+    body::-webkit-scrollbar, body::-webkit-scrollbar-button { display: none; } 
+    .game-section { width: 100%; height: 100%; background: #000; position: relative; align-items: center; justify-content: center; }
+    #unity-loading-bar { background: #000; position: absolute; top: 60%; align-items: center; justify-content: center; z-index: 15; width: 100%; text-align: center; }
+    .info-section { width: 100%; height: 100%; background: #000; position: relative; padding: 20px 0; color: white; }
+    #unity-canvas { background: #000; width: 100%; float: left; height: calc(var(--vh, 1vh)*100); overscroll-behavior: none; }
+    .container { width: calc(100% - 420px); margin: 20px auto; padding: 20px; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); border-radius: 10px; color: black; }
+    .spinning-wheel { display: inline-block; transform-origin: center; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* FORCE HIDE ALL AD BOXES */
+    #adContainerMainMenu, #adContainerTop, #adContainerBottom, #adContainerPillars, #videoAdOverlay { 
+        display: none !important; 
+        visibility: hidden !important; 
+        pointer-events: none !important; 
+    }
   </style>
+
+  <script>
+    // --- AD BLOCKING REPLACEMENT ---
+    window.aiptag = { cmd: { display: [], player: [] } };
+    window.isMsStart = false;
+
+    // This is the main "Cheat" - it tells the game the ad is finished the millisecond it's requested
+    function completeVideoAd(isBlocked) {
+      if (typeof window.Main !== "undefined" && typeof window.Main.DoneVideoAd === "function") {
+        window.Main.DoneVideoAd(false);
+      }
+    }
+
+    function ShowVideo(theUnitName, forceAip) {
+      console.log("Ad Blocked: Skipping to game...");
+      completeVideoAd(false);
+    }
+
+    function LoadVideo() { return; }
+    
+    // Stub out tracking so it doesn't break things
+    function SendEvent() { return; }
+    function gtag() { return; }
+    function GA4_SendEvent() { return; }
+    // --- END AD BLOCKING ---
+  </script>
 </head>
 
 <body>
-  <div class="game-section">
-    <canvas id="unity-canvas" tabindex="-1"></canvas>
-    <div id="unity-loading-bar">
-        <p>LOADING KART BROS (AD-FREE)...</p>
+  <noscript>
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Arial;font-size:20px;z-index:9999;">
+      Enable JavaScript bro!
     </div>
+  </noscript>
+
+  <div class="game-section">
+    <canvas id="unity-canvas" tabindex="-1" onblur="window.focus(); window.scrollTo(0, 0);"></canvas>
+
+    <div id="unity-loading-bar">
+      <center>
+        <img src="TemplateData/kart_wheel.png" class="spinning-wheel">
+        <br>
+        <img src="TemplateData/loading4.png">
+        <br>
+        <p style="color:white">LOADING AD-FREE BROS...</p>
+      </center>
+    </div>
+
+    <div id="adContainerMainMenu"></div>
+    <div id="adContainerTop"></div>
+    <div id="adContainerBottom"></div>
+    <div id="adContainerPillars"></div>
   </div>
 
   <script src="Build/UnityLoader.js"></script>
   <script>
-    // This part starts your specific game build
-    // Ensure these file names match what is in your /Build folder
+    // This looks for the local JSON file in your /Build folder
     var unityInstance = UnityLoader.instantiate("unity-canvas", "Build/kartbros.json");
   </script>
+
+  <div class="info-section">
+    <div class="container">
+      <h1>Kart Bros: Ad-Free Edition</h1>
+      <p>Controls: WASD to Drive, Space for Items.</p>
+    </div>
+  </div>
 </body>
 </html>
