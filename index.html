@@ -2,48 +2,49 @@
 <html lang="en-us">
 <head>
     <meta charset="utf-8">
-    <title>KART BROS! - Fix Mode</title>
+    <title>KART BROS - FIXED</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        #unity-canvas { width: 100%; height: 100%; background: #000; transform: translateZ(0); }
-        #loading-overlay { position: absolute; color: white; font-family: sans-serif; text-align: center; z-index: 10; }
+        canvas { width: 100% !important; height: 100% !important; background: #000; }
+        #loading { position: absolute; color: #555; font-family: sans-serif; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="loading-overlay">
-        <h2 id="status">BYPASSING API ERRORS...</h2>
-        <p>If sound plays but screen is blank, click the screen.</p>
-    </div>
-    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="loading">SHADERS INITIALIZING...</div>
+    <canvas id="unity-canvas"></canvas>
 
     <script>
-        // 1. BYPASS CORS & PING ERRORS
-        // This intercepts the 'fetch' calls and tells the game the servers are "Online"
-        const originalFetch = window.fetch;
-        window.fetch = function() {
-            if (arguments[0].includes('ping') || arguments[0].includes('kart')) {
-                return Promise.resolve(new Response(JSON.stringify({ status: 'ok', rtt: 100 }), {
-                    status: 200,
-                    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-                }));
-            }
-            return originalFetch.apply(this, arguments);
+        // --- THE "ANTI-CRASH" SHIELD ---
+        // 1. Fake the Ad SDKs entirely
+        window.aiptag = { cmd: { display: [], player: [] }, adcalled: true };
+        window.Main = { 
+            DoneVideoAd: function() { console.log("Ad Fake Success"); return true; },
+            ShowAd: function() { return true; },
+            ShowVideo: function() { return true; }
         };
 
-        // 2. PREVENT NULLREFERENCE (AD BLOCK)
-        // We create the objects the game expects so it doesn't crash when it can't find them
-        window.aiptag = { cmd: { display: [], player: [] } };
-        window.Main = window.Main || {};
-        window.Main.DoneVideoAd = function() { return true; };
-        window.Main.ShowAd = function() { return true; };
+        // 2. Hijack Network calls to stop CORS/WebSocket hangs
+        const ignoreUrls = ['ping', 'kart', 'google', 'analytics', 'ads'];
+        const bakedFetch = window.fetch;
+        window.fetch = function(url, options) {
+            if (ignoreUrls.some(term => String(url).includes(term))) {
+                return Promise.resolve(new Response(JSON.stringify({status:'ok'}), {status: 200}));
+            }
+            return bakedFetch.apply(this, arguments);
+        };
+
+        // 3. Suppress the specific NullReference Crash
+        window.onerror = function(message) {
+            if (message.includes("NullReferenceException")) {
+                console.warn("Caught game crash - forcing continuation...");
+                return true; // Prevents the browser from stopping the script
+            }
+        };
     </script>
 
     <script src="Build/1c5c2b799f24adb3aee763b89a42a07b.loader.js"></script>
     <script>
-        const canvas = document.querySelector("#unity-canvas");
-        const status = document.querySelector("#status");
-
-        createUnityInstance(canvas, {
+        createUnityInstance(document.querySelector("#unity-canvas"), {
             dataUrl: "Build/e7e6a46b3086885e8d87f10a010ccb74.data.unityweb",
             frameworkUrl: "Build/649344238019636530d089f7c59360f7.framework.js.unityweb",
             codeUrl: "Build/fbaee9566eaf23158954926b50c27e61.wasm.unityweb",
@@ -51,30 +52,22 @@
             companyName: "Blue Wizard Digital",
             productName: "Kart Bros",
             productVersion: "1.62",
-            // GPU & COMPATIBILITY SETTINGS
             devicePixelRatio: 1,
             autoSyncPersistentDataPath: true,
             webglContextAttributes: { 
                 alpha: false, 
-                depth: true, 
                 antialias: false, 
-                preserveDrawingBuffer: true 
+                depth: true, 
+                preserveDrawingBuffer: true,
+                preferLowPowerToHighPerformance: false 
             }
-        }).then((unityInstance) => {
-            document.querySelector("#loading-overlay").style.display = "none";
-            
-            // Forces the canvas to wake up
-            window.dispatchEvent(new Event('resize'));
-
-            // Interaction handler to ensure audio and input focus
-            canvas.addEventListener('mousedown', () => {
-                canvas.focus();
-                // Send a fake "Ad Finished" signal in case the game is stuck waiting
-                unityInstance.SendMessage('AdsManager', 'OnAdClosed'); 
-            });
-
-        }).catch((err) => {
-            status.innerHTML = "CRITICAL ERROR: " + err;
+        }).then((instance) => {
+            document.getElementById('loading').remove();
+            // Force the game to realize ads are "done" 5 seconds after boot
+            setTimeout(() => {
+                instance.SendMessage('AdsManager', 'OnAdClosed');
+                instance.SendMessage('GameManager', 'OnAdClosed');
+            }, 5000);
         });
     </script>
 </body>
